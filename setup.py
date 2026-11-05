@@ -19,8 +19,35 @@ import setuptools
 import os
 import subprocess
 import io
+import re
 
-__version__ = "0.10.6"
+
+def _version_from_git():
+    try:
+        tag = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
+    return tag.lstrip("vV") if tag else None
+
+
+def get_version():
+    """Prefer CI/tag version so release asset names always match the tag."""
+    for key in ("PACKAGE_VERSION", "SETUPTOOLS_SCM_PRETEND_VERSION"):
+        value = os.environ.get(key)
+        if value:
+            return value.lstrip("vV")
+    git_version = _version_from_git()
+    if git_version and re.match(r"^\d+\.\d+", git_version):
+        return git_version
+    # Fallback for non-git / untagged local builds only.
+    return "0.10.6"
+
+
+__version__ = get_version()
 FASTTEXT_SRC = "src"
 
 # Based on https://github.com/pybind/python_example

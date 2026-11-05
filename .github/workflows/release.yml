@@ -16,11 +16,47 @@ permissions:
   contents: write
 
 jobs:
+  meta:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Resolve tag / version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            PUBLISH=true
+          elif [[ -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+            PUBLISH=true
+          else
+            TAG=""
+            PUBLISH=false
+          fi
+
+          # Wheel/PyPI version cannot have a leading v.
+          VERSION="${TAG#v}"
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag='${TAG}' version='${VERSION}' publish=${PUBLISH}"
+
   build_sdist:
     name: Build sdist
+    needs: meta
     runs-on: ubuntu-latest
+    env:
+      PACKAGE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -28,6 +64,9 @@ jobs:
 
       - name: Install build tools
         run: python -m pip install -U pip build
+
+      - name: Show resolved version
+        run: python setup.py --version
 
       - name: Build sdist
         run: python -m build --sdist
@@ -39,14 +78,22 @@ jobs:
 
   build_wheels:
     name: Wheels on ${{ matrix.os }}
+    needs: meta
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-
+    env:
+      PACKAGE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show resolved version
+        shell: bash
+        run: python setup.py --version
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.2.1
@@ -55,10 +102,12 @@ jobs:
           CIBW_BUILD: "cp311-* cp312-* cp313-* cp314-*"
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_* *t-*"
           CIBW_ARCHS_MACOS: "x86_64 arm64"
+          # Pass version into isolated build envs (tag is source of truth).
+          CIBW_ENVIRONMENT: PACKAGE_VERSION="${{ needs.meta.outputs.version }}"
           # Keep macOS wheels portable (setup.py used to pin host OS, e.g. 26.x).
-          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET="11.0"
+          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET="11.0" PACKAGE_VERSION="${{ needs.meta.outputs.version }}"
           # Belt-and-suspenders for MSVC string_view / C++17
-          CIBW_ENVIRONMENT_WINDOWS: CL="/std:c++17"
+          CIBW_ENVIRONMENT_WINDOWS: CL="/std:c++17" PACKAGE_VERSION="${{ needs.meta.outputs.version }}"
           CIBW_TEST_COMMAND: python -c "import fasttext; print('fasttext OK')"
           CIBW_BUILD_VERBOSITY: 1
 
@@ -69,21 +118,11 @@ jobs:
 
   publish_release:
     name: GitHub Release
-    needs: [build_sdist, build_wheels]
+    needs: [meta, build_sdist, build_wheels]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    if: needs.meta.outputs.publish == 'true'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve tag
-        id: tag
-        shell: bash
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          fi
 
       - uses: actions/download-artifact@v4
         with:
@@ -97,8 +136,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: ${{ steps.tag.outputs.name }}
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: ${{ needs.meta.outputs.version }}
           generate_release_notes: true
           files: |
             artifacts/*.whl
