@@ -6,6 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 #include <args.h>
 #include <autotune.h>
 #include <densematrix.h>
@@ -19,11 +24,6 @@
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
-
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
 
 using namespace pybind11::literals;
 namespace py = pybind11;
