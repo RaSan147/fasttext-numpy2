@@ -20,7 +20,7 @@ import os
 import subprocess
 import io
 
-__version__ = "0.10.4"
+__version__ = "0.10.6"
 FASTTEXT_SRC = "src"
 
 # Based on https://github.com/pybind/python_example
