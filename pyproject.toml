@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel", "pybind11"]
 
 [tool.cibuildwheel]
 build = ["cp311-*", "cp312-*", "cp313-*", "cp314-*"]
-skip = ["*-win32", "*-manylinux_i686", "*-musllinux_*", "pp*", "*t-*"]
+skip = ["*-win32", "*-manylinux_i686", "*-musllinux_*", "*t-*"]
 test-command = "python -c \"import fasttext; print('fasttext OK')\""
 build-verbosity = 1
 
@@ -12,3 +12,4 @@ environment = { CL = "/std:c++17" }
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }

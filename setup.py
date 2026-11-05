@@ -124,9 +124,15 @@ class BuildExt(build_ext):
 
     def build_extensions(self):
         if sys.platform == "darwin":
-            mac_osx_version = float(".".join(platform.mac_ver()[0].split(".")[:2]))
-            os.environ["MACOSX_DEPLOYMENT_TARGET"] = str(mac_osx_version)
-            all_flags = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
+            # Do not pin to the builder's macOS version (e.g. 26.x on GHA),
+            # or delocate/cibuildwheel will reject the wheel. Respect an
+            # existing env var (CI) and otherwise target a portable baseline.
+            deployment_target = os.environ.get("MACOSX_DEPLOYMENT_TARGET") or "11.0"
+            os.environ["MACOSX_DEPLOYMENT_TARGET"] = deployment_target
+            all_flags = [
+                "-stdlib=libc++",
+                "-mmacosx-version-min=%s" % deployment_target,
+            ]
             if has_flag(self.compiler, [all_flags[0]]):
                 self.c_opts["unix"] += [all_flags[0]]
             elif has_flag(self.compiler, all_flags):
