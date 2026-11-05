@@ -18,7 +18,6 @@ import sys
 import setuptools
 import os
 import subprocess
-import platform
 import io
 
 __version__ = "0.10.4"
