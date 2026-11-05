@@ -52,8 +52,10 @@ jobs:
         env:
           # Config also lives in pyproject.toml; env keeps CI explicit.
           CIBW_BUILD: "cp311-* cp312-* cp313-* cp314-*"
-          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_* pp* *t-*"
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_* *t-*"
           CIBW_ARCHS_MACOS: "x86_64 arm64"
+          # Keep macOS wheels portable (setup.py used to pin host OS, e.g. 26.x).
+          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET="11.0"
           # Belt-and-suspenders for MSVC string_view / C++17
           CIBW_ENVIRONMENT_WINDOWS: CL="/std:c++17"
           CIBW_TEST_COMMAND: python -c "import fasttext; print('fasttext OK')"
