@@ -152,8 +152,9 @@ class BuildExt(build_ext):
             if has_flag(self.compiler, ["-fvisibility=hidden"]):
                 opts.append("-fvisibility=hidden")
         elif ct == "msvc":
-            opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
+            # C++17 is required for std::string_view (dictionary.h).
             opts.append("/std:c++17")
+            opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
         for ext in self.extensions:
             ext.extra_compile_args = opts
             ext.extra_link_args = extra_link_args
